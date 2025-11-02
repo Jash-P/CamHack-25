@@ -1,3 +1,6 @@
-2025/11/02-02:47:36.878 241e8d7 Reusing MANIFEST /Users/jash/Documents/CamHack-25/chrome-bot-profile/Default/Session Storage/MANIFEST-000001
-2025/11/02-02:47:36.878 241e8d7 Recovering log #55
-2025/11/02-02:47:36.878 241e8d7 Reusing old log /Users/jash/Documents/CamHack-25/chrome-bot-profile/Default/Session Storage/000055.log 
+2025/11/02-11:55:07.848 24ac0a8 Reusing MANIFEST /Users/jash/Documents/CamHack-25/chrome-bot-profile/Default/Session Storage/MANIFEST-000001
+2025/11/02-11:55:07.848 24ac0a8 Recovering log #58
+2025/11/02-11:55:07.849 24ac0a8 Reusing old log /Users/jash/Documents/CamHack-25/chrome-bot-profile/Default/Session Storage/000058.log 
+2025/11/02-11:56:08.785 24ac0a8 Level-0 table #63: started
+2025/11/02-11:56:08.791 24ac0a8 Level-0 table #63: 23216 bytes OK
+2025/11/02-11:56:08.793 24ac0a8 Delete type=0 #58
