@@ -1,0 +1,3 @@
+chatgpt-agent/.env
+chatgpt-agent/venv/
+chatgpt-agent/__pycache__/
