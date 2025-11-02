@@ -12,6 +12,20 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.List;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.google.gson.Gson;
 
 public class FoodexportClient implements ClientModInitializer {
 
@@ -50,28 +64,43 @@ public class FoodexportClient implements ClientModInitializer {
         // For double chests: 54 slots (6x9)
         int containerSize = handler.getRows() * 9; // works for any chest size
 
-        Path exportPath = client.runDirectory.toPath().resolve("chest_export.txt");
-
-        StringBuilder builder = new StringBuilder();
-        builder.append("Chest Export from player: ")
-                .append(client.player.getName().getString())
-                .append("\n\n");
+        // --- Collect item names ---
+        List<String> itemNames = new ArrayList<>();
 
         for (int i = 0; i < containerSize; i++) {
             ItemStack stack = slots.get(i).getStack();
             if (!stack.isEmpty()) {
-                builder.append(stack.getCount())
-                        .append(" x ")
-                        .append(stack.getName().getString())
-                        .append("\n");
+                itemNames.add(stack.getName().getString());
             }
         }
 
-        try {
-            Files.writeString(exportPath, builder.toString(), StandardCharsets.UTF_8);
-            client.player.sendMessage(Text.literal("✅ Chest exported to: " + exportPath.toAbsolutePath()), false);
-        } catch (IOException e) {
-            client.player.sendMessage(Text.literal("❌ Failed to export chest: " + e.getMessage()), false);
-        }
+        // --- Prepare JSON payload ---
+        var payload = new java.util.HashMap<String, Object>();
+        payload.put("player", client.player.getName().getString());
+        payload.put("items", itemNames);
+
+        String json = new Gson().toJson(payload);
+
+        // --- Send API POST request asynchronously ---
+        new Thread(() -> {
+            try {
+                HttpClient httpClient = HttpClient.newHttpClient();
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create("http://localhost:5000/api/chest"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(json))
+                        .build();
+
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+                System.out.println("POST response code: " + response.statusCode());
+                System.out.println("Response body: " + response.body());
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+
+
     }
 }
