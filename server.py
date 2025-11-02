@@ -129,16 +129,25 @@ def gpt(ingredients):
 
 @app.route("/api/chest", methods=["POST"])
 def order():
-    data = request
-    ingreds = data["items"]
-    ingredients = ingreds.join(", ")
-    print("Received order:", data, ingredients)
+    data = request.get_json()
+    ingreds = data.get("items", [])
+    if ingreds:
+        
+        ingredients = ", ".join(ingreds)
+        print("Received order:", data, ingredients)
 
-    output = gpt(ingredients).json()
+        output = gpt(ingredients)
+        try:
+            output_json = json.loads(output)
+        except json.JSONDecodeError:
+            print("gpt returned invalid json", output)
+            output_json = {}
+        
 
-    orders.put(output)
-    print("Order queued")
-    return {"status": "queued"}
+        orders.put(output_json)
+        print("Order queued")
+        return {"status": "queued"}
+    return {"status": "empty"}
 
 @app.route("/api/order", methods=["GET"])
 def next_order():
@@ -147,4 +156,4 @@ def next_order():
     return orders.get()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=8000)

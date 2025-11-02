@@ -64,6 +64,8 @@ public class FoodexportClient implements ClientModInitializer {
         // For double chests: 54 slots (6x9)
         int containerSize = handler.getRows() * 9; // works for any chest size
 
+        System.out.println("test");
+
         // --- Collect item names ---
         List<String> itemNames = new ArrayList<>();
 
@@ -86,7 +88,7 @@ public class FoodexportClient implements ClientModInitializer {
             try {
                 HttpClient httpClient = HttpClient.newHttpClient();
                 HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create("http://localhost:5000/api/chest"))
+                        .uri(URI.create("http://localhost:8000/api/chest"))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(json))
                         .build();
