@@ -7,7 +7,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.action_chains import ActionChains
 import time
 import os
 
@@ -90,11 +89,12 @@ try:
     wait_page_load()
     snap("restaurant_page")
 
-    # ---- 6. Add first menu item (SIMPLE + ROBUST) ----
+    # ---- 6. Add first menu item (USING href="/store/…") ----
     print("4. Adding first item to cart...")
 
     print("   Waiting for menu section...")
-    wait.until(EC.presence_of_element_located((By.XPATH, "//h2 | //h3 | //div[contains(text(), 'Menu') or contains(text(), 'Popular')]")))
+    wait.until(EC.presence_of_element_located(
+        (By.XPATH, "//h2 | //h3 | //div[contains(text(), 'Menu') or contains(text(), 'Featured')]")))
 
     print("   Scrolling to load items...")
     for i in range(6):
@@ -102,45 +102,38 @@ try:
         time.sleep(1.5)
         snap(f"scroll_{i+1}")
 
-    print("   Finding first real item card...")
-    item_card = None
-    for _ in range(20):
-        cards = driver.find_elements(By.XPATH, """
-            //div[
-                not(contains(@class,'skeleton')) and
-                not(contains(@class,'placeholder')) and
-                .//text()[contains(.,'$')]
-            ]
-        """)
-        for card in cards:
-            rect = card.rect
-            if (card.is_displayed() and 
-                rect['height'] > 50 and 
-                rect['width'] > 100):
-                item_card = card
+    print("   Finding first visible menu item by href...")
+    item_link = None
+    for attempt in range(15):
+        candidates = driver.find_elements(
+            By.XPATH,
+            "//a[contains(@href, '/store/') and not(contains(.,'Closed')) and .//img]"
+        )
+        for cand in candidates:
+            if cand.is_displayed() and cand.size['height'] > 30:   # not a hidden stub
+                item_link = cand
                 break
-        if item_card:
+        if item_link:
             break
         time.sleep(1)
 
-    if not item_card:
-        raise Exception("No item with $ found — check scroll_6.png")
+    if not item_link:
+        raise RuntimeError("No visible store-item found – see last scroll_*.png")
 
-    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", item_card)
-    time.sleep(1)
-    snap("before_click_item_card")
+    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", item_link)
+    time.sleep(0.8)
+    snap("before_click_store_item")
 
-    try:
-        ActionChains(driver).move_to_element(item_card).click().perform()
-    except:
-        pass
-    driver.execute_script("arguments[0].click();", item_card)
-    snap("after_click_item_card")
-    time.sleep(4)
+    # Click via JS – bypasses any overlay that Selenium sometimes misses
+    driver.execute_script("arguments[0].click();", item_link)
+    snap("after_click_store_item")
+    time.sleep(3)          # give the modal animation a moment
 
+    # ---- Modal verification (unchanged) ----
     print("   Waiting for modal...")
     WebDriverWait(driver, 15).until(
-        EC.presence_of_element_located((By.XPATH, "//div[contains(@role,'dialog') or contains(@class,'modal') or contains(@class,'sheet')]"))
+        EC.presence_of_element_located(
+            (By.XPATH, "//div[contains(@role,'dialog') or contains(@class,'modal') or contains(@class,'sheet')]"))
     )
     snap("modal_opened")
 
