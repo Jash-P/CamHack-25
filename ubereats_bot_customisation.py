@@ -29,7 +29,7 @@ options.add_argument(f"--user-data-dir={BOT_PROFILE}")
 
 service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=options)
-wait = WebDriverWait(driver, 30)
+wait = WebDriverWait(driver, 10)  # Reduced from 30s
 
 # -------------------------------------------------------------------------
 # Helper utilities
@@ -41,10 +41,9 @@ def snap(name: str):
     print(f"   Screenshot: {path}")
 
 def wait_page_load():
-    WebDriverWait(driver, 15).until(
+    WebDriverWait(driver, 10).until(
         lambda d: d.execute_script("return document.readyState") == "complete"
     )
-    time.sleep(1)
 
 def is_logged_in():
     print("   Checking login status...")
@@ -75,38 +74,48 @@ def is_logged_in():
         print(f"   Login check failed: {e}")
         return False
 
+def wait_for_post_order():
+    """Return True when we are definitely on the order-confirmation page."""
+    return WebDriverWait(driver, 15).until(
+        lambda d: (
+            d.execute_script("return document.location.pathname.includes('/order/')") or
+            len(d.find_elements(By.XPATH,
+                "//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', "
+                "'abcdefghijklmnopqrstuvwxyz'), 'order received') or "
+                "contains(., 'Thank you') or contains(., 'Estimated')]")) > 0
+        )
+    )
+
 # -------------------------------------------------------------------------
 # Re-usable: add the *n*-th visible menu item (0-based)
-# Detects "Most popular" → clicks #1 only if present
+# Uses JS to avoid polling loop
 # -------------------------------------------------------------------------
 def add_item(index: int):
     print(f"   Adding item #{index + 1}...")
 
-    # ---- locate the n-th visible item ---------------------------------
-    item_link = None
-    for attempt in range(15):
-        candidates = driver.find_elements(
-            By.XPATH,
-            "//a[contains(@href, '/store/') and not(contains(.,'Closed')) and .//img]"
-        )
-        visible = [c for c in candidates if c.is_displayed() and c.size['height'] > 30]
-        if len(visible) > index:
-            item_link = visible[index]
-            break
-        time.sleep(1)
-
-    if not item_link:
-        raise RuntimeError(f"Could not find visible item #{index + 1}")
+    # ---- locate the n-th visible item via JS (fast) --------------------
+    item_link = WebDriverWait(driver, 15).until(
+        lambda d: d.execute_script("""
+            const items = Array.from(document.querySelectorAll('a[href*="/store/"]'))
+                .filter(el => {
+                    const text = el.textContent || '';
+                    const img = el.querySelector('img');
+                    const height = el.offsetHeight;
+                    return !text.includes('Closed') && img && height > 30;
+                });
+            return items.length > arguments[0] ? items[arguments[0]] : null;
+        """, index)
+    )
 
     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", item_link)
-    time.sleep(0.8)
+    time.sleep(0.5)
     snap(f"before_click_item_{index+1}")
     driver.execute_script("arguments[0].click();", item_link)
     snap(f"after_click_item_{index+1}")
-    time.sleep(3)
+    time.sleep(1.5)  # modal load
 
     # ---- modal appears ------------------------------------------------
-    modal = WebDriverWait(driver, 15).until(
+    modal = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located(
             (By.XPATH, "//div[contains(@role,'dialog') or contains(@class,'modal') or contains(@class,'sheet')]"))
     )
@@ -116,10 +125,8 @@ def add_item(index: int):
     print("      Checking for 'Most popular' section...")
     most_popular_span = None
     try:
-        most_popular_span = WebDriverWait(driver, 8).until(
-            EC.presence_of_element_located(
-                (By.XPATH, ".//span[text()='Most popular']")
-            )
+        most_popular_span = WebDriverWait(driver, 6).until(
+            EC.presence_of_element_located((By.XPATH, ".//span[normalize-space()='Most popular']"))
         )
         print("      'Most popular' section found → selecting #1")
     except:
@@ -128,24 +135,23 @@ def add_item(index: int):
     # ---- If "Most popular" exists → click #1 -------------------------
     if most_popular_span:
         try:
-            option_span = WebDriverWait(driver, 15).until(
+            option_span = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable(
-                    (By.XPATH,
-                     ".//span[text()='Most popular']/../..//span[contains(text(),'#1')]")
+                    (By.XPATH, ".//span[normalize-space()='Most popular']/../..//span[contains(text(),'#1')]")
                 )
             )
             driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", option_span)
-            time.sleep(0.6)
-            ActionChains(driver).move_to_element(option_span).pause(0.4).click().perform()
+            time.sleep(0.4)
+            ActionChains(driver).move_to_element(option_span).pause(0.3).click().perform()
             print("      #1 option selected")
             snap(f"prebuilt_selected_item_{index+1}")
-            time.sleep(2.0)
+            time.sleep(1.2)
         except Exception as e:
             print(f"      Failed to click #1 (fallback to default): {e}")
 
     # ---- Click "Add to order" -----------------------------------------
     print("      Clicking 'Add to order'...")
-    add_btn = WebDriverWait(driver, 20).until(
+    add_btn = WebDriverWait(driver, 12).until(
         EC.element_to_be_clickable(
             (By.XPATH,
              "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'add') "
@@ -155,12 +161,12 @@ def add_item(index: int):
     ActionChains(driver).move_to_element(add_btn).click().perform()
     print("      Add button clicked")
     snap(f"add_clicked_item_{index+1}")
-    time.sleep(2.0)
+    time.sleep(1.0)
 
     # ---- Verify cart badge --------------------------------------------
     expected_qty = index + 1
     try:
-        badge = WebDriverWait(driver, 12).until(
+        badge = WebDriverWait(driver, 8).until(
             EC.presence_of_element_located(
                 (By.XPATH,
                  f"//*[self::span or self::button or self::a or self::div]"
@@ -198,125 +204,110 @@ try:
     except:
         print("Address set.\n")
 
-    # ---- search --------------------------------------------------------
-    print("2. Searching for food...")
-    search = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[contains(@placeholder,'Search')]")))
-    search.clear()
-    search.send_keys("pizza")  # Change to "Taco Bell" to test
-    search.send_keys(Keys.ENTER)
+    # ---- search (FAST) -------------------------------------------------
+    print("2. Searching for 'pizza'...")
+    search = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, "//input[contains(@placeholder,'Search') or contains(@placeholder,'delivery')]"))
+    )
+    driver.execute_script("arguments[0].scrollIntoView(true);", search)
+    time.sleep(0.3)
+    ActionChains(driver).click(search).send_keys("pizza").send_keys(Keys.ENTER).perform()
     wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(@href,'/store/')]")))
     snap("search_results")
 
     # ---- pick first open restaurant ------------------------------------
     print("3. Selecting first open restaurant...")
-    time.sleep(3)
-    stores = driver.find_elements(By.XPATH, "//a[contains(@href,'/store/') and not(contains(.,'Closed'))]")
-    if not stores:
-        raise RuntimeError("No open restaurants")
-    restaurant = stores[0]
+    restaurant = WebDriverWait(driver, 12).until(
+        lambda d: d.execute_script("""
+            const stores = Array.from(document.querySelectorAll('a[href*="/store/"]'))
+                .filter(el => !el.textContent.includes('Closed') && el.offsetHeight > 50);
+            return stores.length > 0 ? stores[0] : null;
+        """)
+    )
     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", restaurant)
-    time.sleep(1)
+    time.sleep(0.6)
     driver.execute_script("arguments[0].click();", restaurant)
     wait_page_load()
     snap("restaurant_page")
 
-    # ---- load menu -----------------------------------------------------
+    # ---- wait for menu -------------------------------------------------
     print("4. Loading menu...")
     wait.until(EC.presence_of_element_located(
         (By.XPATH, "//h2 | //h3 | //div[contains(text(), 'Menu') or contains(text(), 'Featured')]")))
-    for i in range(6):
-        driver.execute_script("window.scrollBy(0, 1000);")
-        time.sleep(1.5)
-        snap(f"scroll_{i+1}")
+    time.sleep(1.0)  # minimal load
 
     # ---- add 1st and 3rd items -----------------------------------------
     add_item(0)   # 1st item
     add_item(2)   # 3rd item
 
-    # ---- checkout -------------------------------------------------------
+    # ---- checkout (INSTANT) --------------------------------------------
     print("5. Going to checkout...")
-    checkout_selectors = [
-        "//button[contains(., 'Checkout')]",
-        "//a[contains(., 'Checkout')]",
-        "//button[contains(., 'View cart')]",
-        "//a[contains(., 'View cart')]",
-        "//*[contains(@href, '/checkout') or contains(@href, '/cart')]"
-    ]
-    checkout_elem = None
-    for xpath in checkout_selectors:
-        try:
-            checkout_elem = WebDriverWait(driver, 8).until(
-                EC.element_to_be_clickable((By.XPATH, xpath))
-            )
-            print(f"   Found checkout button: {xpath}")
-            break
-        except:
-            continue
-    if not checkout_elem:
-        raise RuntimeError("Could not find checkout button")
-
-    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", checkout_elem)
-    time.sleep(0.8)
-    try:
-        checkout_elem.click()
-    except:
-        ActionChains(driver).move_to_element(checkout_elem).click().perform()
-
+    checkout_elem = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, 
+            "//button[contains(., 'Checkout')] | "
+            "//a[contains(., 'Checkout')] | "
+            "//button[contains(., 'View cart')] | "
+            "//*[contains(@href, '/checkout') or contains(@href, '/cart')]"
+        ))
+    )
+    ActionChains(driver).move_to_element(checkout_elem).click().perform()
     wait_page_load()
     snap("checkout_page_loaded")
     print("   At checkout page")
 
-    # ---- order and pay (BULLETPROOF) ------------------------------------
+    # ---- order and pay (SMART SCROLL + CONFIRMATION) --------------------
     print("6. Clicking 'Order and Pay'...")
 
-    # Scroll to bottom to load button
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    time.sleep(2.0)
-    snap("checkout_scrolled_bottom")
+    # Find the button (tight selector, case-insensitive)
+    pay_button = WebDriverWait(driver, 12).until(
+        EC.element_to_be_clickable(
+            (By.XPATH,
+             "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "
+             "'place order') or "
+             "contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "
+             "'order and pay') or "
+             "contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "
+             "'pay')]")
+        )
+    )
 
-    pay_selectors = [
-        "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'order and pay')]",
-        "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'place order')]",
-        "//button[contains(., 'Pay') and contains(., '£')]",
-        "//button[contains(., 'Pay') and contains(., '$')]",
-        "//button[contains(@data-testid, 'place-order')]",
-        "//button[.//span[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'pay')]]",
-        "//button[contains(@class, 'place-order') or contains(@class, 'submit') or contains(@class, 'primary')]"
-    ]
+    # Scroll into view (center + small header offset)
+    driver.execute_script(
+        "arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});"
+        "window.scrollBy(0, -120);",
+        pay_button
+    )
+    time.sleep(0.5)                     # tiny stabilisation
 
-    pay_button = None
-    for xpath in pay_selectors:
-        try:
-            pay_button = WebDriverWait(driver, 15).until(
-                EC.element_to_be_clickable((By.XPATH, xpath))
-            )
-            print(f"   Found pay button: {xpath}")
-            break
-        except:
-            continue
-
-    if not pay_button:
-        try:
-            pay_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable(
-                    (By.XPATH, "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'pay')]")
-                )
-            )
-            print("   Fallback: Found button with 'pay'")
-        except:
-            raise RuntimeError("Could not find 'Order and Pay' button — see FINAL_ERROR.png")
-
-    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", pay_button)
-    time.sleep(1.2)
-
+    # ---- CLICK -------------------------------------------------------
     try:
-        ActionChains(driver).move_to_element(pay_button).pause(0.5).click(pay_button).perform()
+        ActionChains(driver).move_to_element(pay_button).pause(0.4).click().perform()
         print("   'Order and Pay' clicked (ActionChains)")
-    except Exception as e:
-        print(f"   ActionChains failed, trying JS click: {e}")
+    except Exception as e1:
+        print(f"   ActionChains failed ({e1}), trying JS click...")
         driver.execute_script("arguments[0].click();", pay_button)
         print("   'Order and Pay' clicked (JS)")
 
+    # ---- CONFIRM THE CLICK TOOK EFFECT -------------------------------
+    # 1. Button disappears / becomes stale
+    try:
+        WebDriverWait(driver, 8).until(EC.staleness_of(pay_button))
+        print("   Pay button disappeared – click registered")
+    except:
+        print("   Pay button still present – possible overlay, retrying once...")
+        # retry once with JS
+        driver.execute_script("arguments[0].click();", pay_button)
+        WebDriverWait(driver, 8).until(EC.staleness_of(pay_button))
+
+    # 2. Wait for a post-order indicator (any of these is enough)
+    post_order_indicator = WebDriverWait(driver, 15).until(
+        lambda d: (
+            d.execute_script("return document.location.pathname.includes('/order/')") or
+            len(d.find_elements(By.XPATH, "//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', "
+                                          "'abcdefghijklmnopqrstuvwxyz'), 'order received') or "
+                                          "contains(., 'Thank you') or contains(., 'Estimated')]")) > 0
+        )
+    )
     snap("order_submitted")
     print("\nORDER PLACED! Check order_submitted.png")
 
