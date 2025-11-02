@@ -1,0 +1,6 @@
+2025/11/02-12:26:55.980 24b45aa Reusing MANIFEST /Users/jash/Documents/CamHack-25/chrome-bot-profile/Default/Local Storage/leveldb/MANIFEST-000001
+2025/11/02-12:26:55.983 24b45aa Recovering log #7
+2025/11/02-12:26:55.983 24b45aa Reusing old log /Users/jash/Documents/CamHack-25/chrome-bot-profile/Default/Local Storage/leveldb/000007.log 
+2025/11/02-12:27:55.985 24b45ad Level-0 table #11: started
+2025/11/02-12:27:55.988 24b45ad Level-0 table #11: 11628 bytes OK
+2025/11/02-12:27:55.990 24b45ad Delete type=0 #7

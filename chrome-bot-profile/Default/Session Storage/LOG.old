@@ -1,0 +1,15 @@
+2025/11/02-12:26:56.037 24b45aa Reusing MANIFEST /Users/jash/Documents/CamHack-25/chrome-bot-profile/Default/Session Storage/MANIFEST-000001
+2025/11/02-12:26:56.038 24b45aa Recovering log #68
+2025/11/02-12:26:56.038 24b45aa Reusing old log /Users/jash/Documents/CamHack-25/chrome-bot-profile/Default/Session Storage/000068.log 
+2025/11/02-12:27:56.810 24b45aa Level-0 table #72: started
+2025/11/02-12:27:56.814 24b45aa Level-0 table #72: 18786 bytes OK
+2025/11/02-12:27:56.816 24b45aa Delete type=0 #68
+2025/11/02-12:27:56.817 24b45aa Compacting 4@0 + 1@1 files
+2025/11/02-12:27:56.826 24b45aa Generated table #73@0: 6922 keys, 243952 bytes
+2025/11/02-12:27:56.826 24b45aa Compacted 4@0 + 1@1 files => 243952 bytes
+2025/11/02-12:27:56.827 24b45aa compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/11/02-12:27:56.828 24b45aa Delete type=2 #63
+2025/11/02-12:27:56.828 24b45aa Delete type=2 #60
+2025/11/02-12:27:56.828 24b45aa Delete type=2 #65
+2025/11/02-12:27:56.828 24b45aa Delete type=2 #72
+2025/11/02-12:27:56.828 24b45aa Delete type=2 #69
